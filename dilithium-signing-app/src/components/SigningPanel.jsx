@@ -1,26 +1,34 @@
-import React, { useState } from "react";
-import { FileSignature } from "lucide-react";
+import { useState } from "react";
+import { FileSignature, Lock, Download, CheckCircle } from "lucide-react";
 import FileUploader from "./FileUploader";
-import SignatureDisplay from "./SignatureDisplay";
 import { signData } from "../services/dilithiumService";
 import { readFileAsBytes } from "../services/fileService";
-import { ERROR_MESSAGES } from "../utils/constants";
+import { readFileAsText, parsePEMFile, createSignedFile } from "../utils/cryptoUtils";
 
-const SigningPanel = ({ keyPair, setError }) => {
+const SigningPanel = ({ setError }) => {
+  const [privateKeyFile, setPrivateKeyFile] = useState(null);
   const [signingMode, setSigningMode] = useState("text");
   const [message, setMessage] = useState("");
   const [selectedFile, setSelectedFile] = useState(null);
   const [signature, setSignature] = useState("");
   const [loading, setLoading] = useState(false);
 
+  const handlePrivateKeySelect = (file) => {
+    if (file && !file.name.endsWith(".pem")) {
+      setError("Molimo odaberite .pem fajl za privatni ključ!");
+      return;
+    }
+    setError("");
+    setPrivateKeyFile(file);
+  };
+
   const handleSignText = async () => {
-    console.log(keyPair);
-    if (!keyPair) {
-      alert(ERROR_MESSAGES.NO_KEYPAIR);
+    if (!privateKeyFile) {
+      setError("Molimo učitajte privatni ključ (.pem fajl)!");
       return;
     }
     if (!message.trim()) {
-      alert(ERROR_MESSAGES.NO_MESSAGE);
+      setError("Molimo unesite poruku koju želite potpisati!");
       return;
     }
 
@@ -29,8 +37,10 @@ const SigningPanel = ({ keyPair, setError }) => {
     setSignature("");
 
     try {
+      const keyContent = await readFileAsText(privateKeyFile);
+      const privateKeyRaw = parsePEMFile(keyContent);
       const messageBytes = new TextEncoder().encode(message);
-      const sig = await signData(messageBytes, keyPair.privateKeyRaw);
+      const sig = await signData(messageBytes, privateKeyRaw);
       setSignature(sig);
     } catch (err) {
       setError(err?.message || "Greška prilikom potpisivanja poruke.");
@@ -40,12 +50,12 @@ const SigningPanel = ({ keyPair, setError }) => {
   };
 
   const handleSignFile = async () => {
-    if (!keyPair) {
-      alert(ERROR_MESSAGES.NO_KEYPAIR);
+    if (!privateKeyFile) {
+      setError("Molimo učitajte privatni ključ (.pem fajl)!");
       return;
     }
     if (!selectedFile) {
-      alert(ERROR_MESSAGES.NO_FILE);
+      setError("Molimo učitajte fajl koji želite potpisati!");
       return;
     }
 
@@ -54,8 +64,10 @@ const SigningPanel = ({ keyPair, setError }) => {
     setSignature("");
 
     try {
+      const keyContent = await readFileAsText(privateKeyFile);
+      const privateKeyRaw = parsePEMFile(keyContent);
       const fileBytes = await readFileAsBytes(selectedFile);
-      const sig = await signData(fileBytes, keyPair.privateKeyRaw);
+      const sig = await signData(fileBytes, privateKeyRaw);
       setSignature(sig);
     } catch (err) {
       setError(err?.message || "Greška prilikom potpisivanja fajla.");
@@ -72,11 +84,60 @@ const SigningPanel = ({ keyPair, setError }) => {
     // setSelectedFile(null);
   };
 
+  const downloadSignedData = async () => {
+    if (!signature) return;
+    
+    try {
+      if (signingMode === "text") {
+        // For text: create embedded signed container
+        const messageFile = new File([message], "message.txt", { type: 'text/plain' });
+        const messageBytes = new TextEncoder().encode(message);
+        const signedFileBytes = await createSignedFile(messageFile, messageBytes, signature);
+        
+        const blob = new Blob([signedFileBytes], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = "message.signed";
+        a.click();
+        URL.revokeObjectURL(url);
+      } else if (signingMode === "file" && selectedFile) {
+        // For file: create embedded signed container
+        const fileBytes = await readFileAsBytes(selectedFile);
+        const signedFileBytes = await createSignedFile(selectedFile, fileBytes, signature);
+        
+        const blob = new Blob([signedFileBytes], { type: 'application/octet-stream' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = selectedFile.name + ".signed";
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      setError("Greška pri preuzimanju potpisanog fajla: " + err.message);
+    }
+  };
+
   return (
     <section className="rounded-lg border border-gray-200 bg-white p-4">
       <div className="mb-3 flex items-center gap-2">
         <FileSignature className="h-5 w-5" />
         <h3 className="text-lg font-semibold">2. Potpisivanje sadržaja</h3>
+      </div>
+
+      <div className="mb-4 rounded-lg bg-blue-50 border border-blue-200 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Lock className="h-4 w-4 text-blue-600" />
+          <label className="text-sm font-medium text-blue-900">Privatni ključ (obavezno)</label>
+        </div>
+        <FileUploader
+          selectedFile={privateKeyFile}
+          setSelectedFile={handlePrivateKeySelect}
+          id="signing-private-key"
+          label="Odaberi .pem fajl sa privatnim ključem"
+          accept=".pem"
+        />
       </div>
 
       <div className="mb-4 flex gap-3">
@@ -123,6 +184,23 @@ const SigningPanel = ({ keyPair, setError }) => {
           >
             {loading ? "Potpisivanje..." : "Potpiši poruku"}
           </button>
+
+          {signature && (
+            <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <h4 className="font-semibold text-green-900">Potpis uspješno kreiran!</h4>
+              </div>
+              <button
+                type="button"
+                onClick={downloadSignedData}
+                className="w-full rounded-lg bg-green-600 hover:bg-green-700 py-2 text-white font-medium flex items-center justify-center gap-2 transition-all"
+              >
+                <Download className="h-4 w-4" />
+                Preuzmi potpisanu poruku
+              </button>
+            </div>
+          )}
         </div>
       ) : (
         <div>
@@ -141,15 +219,23 @@ const SigningPanel = ({ keyPair, setError }) => {
           >
             {loading ? "Potpisivanje..." : "Potpiši fajl"}
           </button>
-        </div>
-      )}
 
-      {signature && (
-        <div className="mt-4">
-          <SignatureDisplay
-            signature={signature}
-            filename={signingMode === "file" ? selectedFile?.name : "message"}
-          />
+          {signature && (
+            <div className="mt-4 rounded-lg bg-green-50 border border-green-200 p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <h4 className="font-semibold text-green-900">Potpis uspješno kreiran!</h4>
+              </div>
+              <button
+                type="button"
+                onClick={downloadSignedData}
+                className="w-full rounded-lg bg-green-600 hover:bg-green-700 py-2 text-white font-medium flex items-center justify-center gap-2 transition-all"
+              >
+                <Download className="h-4 w-4" />
+                Preuzmi potpisani fajl
+              </button>
+            </div>
+          )}
         </div>
       )}
     </section>

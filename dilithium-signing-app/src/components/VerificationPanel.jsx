@@ -1,24 +1,34 @@
 import React, { useState } from "react";
-import { CheckCircle, XCircle } from "lucide-react";
+import { CheckCircle, XCircle, Globe } from "lucide-react";
 import FileUploader from "./FileUploader";
 import { verifySignature } from "../services/dilithiumService";
 import { readFileAsBytes } from "../services/fileService";
-import { ERROR_MESSAGES } from "../utils/constants";
+import { readFileAsText, extractSignedFile } from "../utils/cryptoUtils";
+import { parsePEMFile } from "../utils/cryptoUtils";
 
-const VerificationPanel = ({ keyPair, setError }) => {
-  const [verificationFile, setVerificationFile] = useState(null);
-  const [verificationSignature, setVerificationSignature] = useState("");
+const VerificationPanel = ({ setError }) => {
+  const [publicKeyFile, setPublicKeyFile] = useState(null);
+  const [signedFile, setSignedFile] = useState(null);
   const [verificationResult, setVerificationResult] = useState(null);
   const [loading, setLoading] = useState(false);
 
+  const handlePublicKeySelect = (file) => {
+    if (file && !file.name.endsWith(".pub")) {
+      setError("Molimo odaberite .pub fajl za javni ključ!");
+      return;
+    }
+    setError("");
+    setPublicKeyFile(file);
+  };
+
   const handleVerify = async () => {
-    if (!keyPair) {
-      alert(ERROR_MESSAGES.NO_KEYPAIR);
+    if (!publicKeyFile) {
+      setError("Molimo učitajte javni ključ (.pub fajl)!");
       return;
     }
 
-    if (!verificationFile || !verificationSignature.trim()) {
-      alert(ERROR_MESSAGES.NO_VERIFICATION_DATA);
+    if (!signedFile) {
+      setError("Molimo učitajte potpisani fajl!");
       return;
     }
 
@@ -27,15 +37,21 @@ const VerificationPanel = ({ keyPair, setError }) => {
     setVerificationResult(null);
 
     try {
-      const fileBytes = await readFileAsBytes(verificationFile);
+      const keyContent = await readFileAsText(publicKeyFile);
+      const publicKeyRaw = parsePEMFile(keyContent);
+      
+      // Extract signature and file bytes from signed container
+      const signedFileBytes = await readFileAsBytes(signedFile);
+      const { fileBytes, signature } = await extractSignedFile(signedFileBytes);
+      
       const isValid = await verifySignature(
-        verificationSignature,
+        signature,
         fileBytes,
-        keyPair.publicKeyRaw
+        publicKeyRaw
       );
       setVerificationResult(isValid);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || "Greška pri verifikaciji potpisa.");
       setVerificationResult(false);
     } finally {
       setLoading(false);
@@ -48,18 +64,29 @@ const VerificationPanel = ({ keyPair, setError }) => {
         3. Verifikacija potpisa
       </h3>
 
-      <FileUploader
-        label="Odaberite fajl za verifikaciju"
-        onFileSelect={setVerificationFile}
-      />
+      <div className="mb-4 rounded-lg bg-purple-50 border border-purple-200 p-3">
+        <div className="flex items-center gap-2 mb-2">
+          <Globe className="h-4 w-4 text-purple-600" />
+          <label className="text-sm font-medium text-purple-900">Javni ključ (obavezno)</label>
+        </div>
+        <FileUploader
+          selectedFile={publicKeyFile}
+          setSelectedFile={handlePublicKeySelect}
+          id="verify-public-key"
+          label="Odaberi .pub fajl sa javnim ključem"
+          accept=".pub"
+        />
+      </div>
 
-      <textarea
-        value={verificationSignature}
-        onChange={(e) => setVerificationSignature(e.target.value)}
-        placeholder="Zalijepite potpis za verifikaciju..."
-        className="mt-3 w-full rounded-lg border border-gray-300 p-3 focus:border-transparent focus:ring-2 focus:ring-indigo-500"
-        rows={3}
-      />
+      <div className="mb-3">
+        <label className="text-sm font-medium text-gray-700 block mb-2">Potpisani fajl</label>
+        <FileUploader
+          selectedFile={signedFile}
+          setSelectedFile={setSignedFile}
+          id="verify-signed-file-upload"
+          label="Odaberi potpisani fajl (sa ugrađenim potpisom)"
+        />
+      </div>
 
       <button
         onClick={handleVerify}

@@ -183,8 +183,7 @@ textarea {
 /* Cursor */
 .cursor-pointer { cursor: pointer; }
 
-/* Group (ne mora ništa, ali ostavljam) */
-.group {}
+/* Group */
 
 /* Code */
 code, pre {

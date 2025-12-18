@@ -10,9 +10,7 @@ import { MODES } from "./utils/constants";
 import { useDilithium } from "./services/dilithiumService";
 
 function App() {
-  // ✅ default potpisivanje (ali MainMenu možeš prikazati po želji)
   const [mode, setMode] = useState(MODES.SIGN);
-  const [keyPair, setKeyPair] = useState(null);
   const [error, setError] = useState("");
   const { dilithiumLoaded } = useDilithium();
 
@@ -59,25 +57,14 @@ function App() {
         {/* Aktivni prikaz */}
         <div className="grid gap-6">
           {mode === MODES.SIGN && (
-            <>
-              <SigningPanel
-                keyPair={keyPair}
-                setError={setError}
-                disabled={!dilithiumLoaded || !keyPair}
-              />
-
-              {dilithiumLoaded && !keyPair && (
-                <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
-                  Nemaš generisan par ključeva. Idi na <strong>Generiši ključeve</strong>{" "}
-                  i kreiraj novi par, pa se vrati na potpisivanje.
-                </div>
-              )}
-            </>
+            <SigningPanel
+              setError={setError}
+              disabled={!dilithiumLoaded}
+            />
           )}
 
           {mode === MODES.VERIFY && (
             <VerificationPanel
-              keyPair={keyPair}
               setError={setError}
               disabled={!dilithiumLoaded}
             />
@@ -86,11 +73,6 @@ function App() {
           {mode === MODES.GENERATE && (
             <KeyGenerator
               setError={setError}
-              onKeyPairGenerated={(kp) => {
-                setKeyPair(kp);
-                // opciono: automatski prebaci na potpisivanje nakon generisanja
-                setMode(MODES.SIGN);
-              }}
             />
           )}
         </div>

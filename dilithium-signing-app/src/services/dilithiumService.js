@@ -49,6 +49,8 @@ export const signData = async (dataBytes, privateKeyRaw, kind = 2) => {
   try {
     const dilithium = await getDilithium();
     const { signature } = dilithium.sign(dataBytes, privateKeyRaw, kind);
+
+    console.log("Generated signature:", arrayToHex(signature));
     return arrayToHex(signature);
   } catch (err) {
     throw new Error(
