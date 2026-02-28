@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 import { Key } from "lucide-react";
 
 import MainMenu from "./components/MainMenu";
