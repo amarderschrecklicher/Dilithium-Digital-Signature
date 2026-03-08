@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Key } from "lucide-react";
+import { Download } from "lucide-react";
 import { generateDilithiumKeyPair } from "../services/dilithiumService";
 import {
   savePrivateKeyToFile,

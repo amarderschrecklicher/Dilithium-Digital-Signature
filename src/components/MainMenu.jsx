@@ -57,6 +57,13 @@ const MainMenu = ({ currentMode, setCurrentMode }) => {
       description: "Provjeri autentičnost digitalnog potpisa",
       color: "purple",
     },
+    {
+      id: MODES.TEST,
+      icon: Key,
+      title: "Test performansi",
+      description: "Izmjeri vrijeme generisanja ključeva, potpisivanja i verifikacije",
+      color: "indigo",
+    }
   ];
 
   return (

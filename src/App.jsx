@@ -5,6 +5,8 @@ import MainMenu from "./components/MainMenu";
 import KeyGenerator from "./components/KeyGenerator";
 import SigningPanel from "./components/SigningPanel";
 import VerificationPanel from "./components/VerificationPanel";
+import PerformanceTester from "./components/PerformanceTester";
+
 
 import { MODES } from "./utils/constants";
 import { useDilithium } from "./services/dilithiumService";
@@ -72,6 +74,11 @@ function App() {
 
           {mode === MODES.GENERATE && (
             <KeyGenerator
+              setError={setError}
+            />
+          )}
+          {mode === MODES.TEST && (
+            <PerformanceTester
               setError={setError}
             />
           )}

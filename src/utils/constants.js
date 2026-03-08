@@ -20,6 +20,7 @@ export const MODES = {
   SIGN: "sign",
   VERIFY: "verify",
   GENERATE: "keys",
+  TEST: "test"
 };
 
 export const ERROR_MESSAGES = {
